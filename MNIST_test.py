@@ -16,7 +16,6 @@ def one_hot_labels(labels):
 
 #Load MNIST dataset and train neural network on it.
 def main():
-    #np.random.seed(100)
 
     #Load training dataset and randomize.
     trainData, trainLabels = readData('images_train.csv', 'labels_train.csv')
