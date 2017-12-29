@@ -4,11 +4,7 @@ import numpy as np
 import activations
 import loss_functions
 
-'''
-This class provides a python implementation of a fully connected neural network API
-using sigmoid or relu nonlinearities and softmax cross entropy loss. 
-'''
-
+#This class provides a python implementation of a fully connected neural network API.
 
 class NeuralNet:
     '''
