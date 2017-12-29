@@ -2,4 +2,4 @@
 *.csv
 *.xml
 .idea/NeuralNetwork.iml
-__pycache__/neuralNet.cpython-36.pyc
+*.pyc
