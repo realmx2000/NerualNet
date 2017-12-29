@@ -47,7 +47,7 @@ def main():
     net = NeuralNet(2, [300, 150], trainData.shape[1], 10, 'sigmoid', 'cross entropy')
     print('Beginning Training.')
     net.input_data(trainData, trainLabels, devData, devLabels)
-    params = net.nn_train(0.0001, 50, 1000, 5, 0.985, True)
+    params = net.nn_train(0.0001, 50, 1000, 7.5, 0.98, True)
 
     # Save parameters.
     pickle.dump(params, open('params.pickle', 'wb'))

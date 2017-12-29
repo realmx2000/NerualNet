@@ -4,7 +4,7 @@ import numpy as np
 import activations
 import loss_functions
 
-#This class provides a python implementation of a fully connected neural network API.
+#This class provides a python implementation of a fully connected neural network.
 
 class NeuralNet:
     '''
@@ -12,7 +12,7 @@ class NeuralNet:
     layer_sizes is a list containing the number of neurons in each layer.
     input dimension is the dimension of the input data (number of features), and output
     dimension is the number of classes to classify into. Activation should be 'relu' or
-    'sigmoid'.
+    'sigmoid'. Loss should be 'cross entropy' or 'hinge'.
     '''
 
     def __init__(self, num_hidden_layers, layer_sizes, input_dimension, output_dimension, activation, loss):
@@ -168,10 +168,12 @@ class NeuralNet:
             for bias in self.b:
                 params[bias] -= learning_rate * grads[bias]
 
-            # If verbose is set to true, provide progress reports every epoch.
+            # Decay the learning rate every epoch
             if it % (m // batch_size) == 0:
                 epoch += 1
                 learning_rate *= decay_rate
+
+                # If verbose, provide a progress report
                 if verbose:
                     # Evaluate model on both the entire training set and the entire dev set.
                     _, _, train_loss = self.forward_prop(self.trainData, self.trainLabels, params)
@@ -187,7 +189,7 @@ class NeuralNet:
                     training_accs.append(train_accuracy)
                     dev_accs.append(dev_accuracy)
 
-        # If verbose is true, plot model performance history.
+        # If verbose, plot model performance history.
         if verbose:
             self.plot(training_accs, dev_accs, training_losses, dev_losses, epochs)
             plt.show()
