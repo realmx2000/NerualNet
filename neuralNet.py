@@ -1,3 +1,7 @@
+'''
+ Created by Zhaoyu Lou on 12/20/17.
+'''
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -17,7 +21,7 @@ class NeuralNet:
 
     def __init__(self, num_hidden_layers, layer_sizes, input_dimension, output_dimension, activation, loss):
         # Some basic error checking
-        assert (activation in ['relu', 'sigmoid']), 'Activation must be either \'relu\' or \'sigmoid\'!'
+        assert (activation in ['relu', 'sigmoid', 'tanh']), 'Activation must be either \'relu\', \'sigmoid\' or \'tanh\'!'
         assert (loss in ['cross entropy', 'hinge']), 'Loss must be either \'cross entropy\' or \'hinge\'!'
         assert (len(layer_sizes) == num_hidden_layers), 'Too many or too few layer sizes given!'
 
@@ -32,6 +36,8 @@ class NeuralNet:
             self.activation = activations.ReLU()
         elif activation == 'sigmoid':
             self.activation = activations.Sigmoid()
+        elif activation == 'tanh':
+            self.activation = activations.Tanh()
 
         # Set loss function
         if loss == 'cross entropy':
@@ -81,7 +87,7 @@ class NeuralNet:
         self.devData = devData.T
         self.devLabels = (devLabels.T).astype(int)
 
-    # Forward pass of the neural net, also caches the layer outputs for backprop.
+    # Forward pass of the neural net, also caches the layer outputs for more efficient backprop.
     # Returns the predictions and the cost, along with the cached values.
     def forward_prop(self, data, labels, params):
         cache = {}
@@ -135,7 +141,6 @@ class NeuralNet:
     and has no effect on the training. If verbose is set to true, the progress is reported every epoch and a 
     plot of the performance history is generated at the end. Returns the set of trained parameters.
     '''
-
     def nn_train(self, reg_strength, epochs, batch_size, learning_rate, decay_rate, verbose):
         # Initialize variables, preprocess data.
         m = self.trainData.shape[1]

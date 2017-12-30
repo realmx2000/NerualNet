@@ -1,3 +1,7 @@
+'''
+ Created by Zhaoyu Lou on 12/24/17.
+'''
+
 import numpy as np
 from neuralNet import NeuralNet
 import pickle

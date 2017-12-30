@@ -1,3 +1,7 @@
+'''
+ Created by Zhaoyu Lou on 12/28/17.
+'''
+
 import numpy as np
 
 '''
@@ -5,6 +9,17 @@ This file supplies the activation functions for the neural network. Each activat
 has an activate method, which calculates the activation for forwards propagation, and a 
 gradient method, which calculates the gradient for backpropagation.
 '''
+
+class Tanh:
+
+    #Elementwise hyperbolic tangent function on input
+    def activate(self, x):
+        return np.tanh(x)
+
+    def gradient(self, x):
+        grad = 0
+        #TODO: figure out gradient
+        return grad
 
 #Sigmoid Activation
 class Sigmoid:
