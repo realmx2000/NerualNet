@@ -17,8 +17,8 @@ class Tanh:
         return np.tanh(x)
 
     def gradient(self, x):
-        grad = 0
-        #TODO: figure out gradient
+        val = np.tanh(x)
+        grad = 1 - val * val
         return grad
 
 #Sigmoid Activation
