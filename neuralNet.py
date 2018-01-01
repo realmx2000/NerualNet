@@ -7,8 +7,10 @@ import numpy as np
 
 import activations
 import loss_functions
+import optimizers
 
-#This class provides a python implementation of a fully connected neural network.
+
+# This class provides a python implementation of a fully connected neural network.
 
 class NeuralNet:
     '''
@@ -19,17 +21,29 @@ class NeuralNet:
     'sigmoid'. Loss should be 'cross entropy' or 'hinge'.
     '''
 
-    def __init__(self, num_hidden_layers, layer_sizes, input_dimension, output_dimension, activation, loss):
+    def __init__(self, num_hidden_layers, layer_sizes, input_dimension, output_dimension,
+                 activation='relu', loss='cross entropy', optimizer='sgd'):
         # Some basic error checking
-        assert (activation in ['relu', 'sigmoid', 'tanh']), 'Activation must be either \'relu\', \'sigmoid\' or \'tanh\'!'
-        assert (loss in ['cross entropy', 'hinge']), 'Loss must be either \'cross entropy\' or \'hinge\'!'
-        assert (len(layer_sizes) == num_hidden_layers), 'Too many or too few layer sizes given!'
+        assert (activation in ['relu', 'sigmoid', 'tanh']), 'Activation must be \'relu\', \'sigmoid\' or \'tanh\'.'
+        assert (loss in ['cross entropy', 'hinge']), 'Loss must be either \'cross entropy\' or \'hinge\'.'
+        assert (len(layer_sizes) == num_hidden_layers), 'Too many or too few layer sizes given.'
+        assert (optimizer in ['sgd', 'momentum', 'adagrad', 'rmsprop']), \
+            'Optimizer must be \'sgd\', \'momentum\', \'adagrad\', \'rmsprop\', or \'adam\'.'
 
         # Set hyperparameters
         self.num_layers = num_hidden_layers
         self.layer_sizes = layer_sizes
         self.input_dimension = input_dimension
         self.num_classes = output_dimension
+
+        # These two variables are for ease of readability in later functions
+        self.w = ['W1']
+        self.b = ['b1']
+        for layer in range(1, self.num_layers + 1):
+            weight = 'W' + str(layer + 1)
+            bias = 'b' + str(layer + 1)
+            self.w.append(weight)
+            self.b.append(bias)
 
         # Set activation function
         if activation == 'relu':
@@ -45,36 +59,36 @@ class NeuralNet:
         elif loss == 'hinge':
             self.loss = loss_functions.Hinge()
 
+        # Set optimizer
+        if optimizer == 'sgd':
+            self.optimizer = optimizers.SGD(self.w, self.b)
+        elif optimizer == 'momentum':
+            self.optimizer = optimizers.Momentum(self.w, self.b)
+        elif optimizer == 'adagrad':
+            self.optimizer = optimizers.Adagrad(self.w, self.b)
+        elif optimizer == 'rmsprop':
+            self.optimizer = optimizers.RMSprop(self.w, self.b)
+        elif optimizer == 'adam':
+            self.optimizer = optimizers.Adam(self.w, self.b)
+
     # Initializes the architecture of the network and handles some internal book keeping.
     # Returns a dictionary of all weights and biases.
     def init_params(self):
         params = {}
 
-        # These two variables are just for ease of readability in later functions.
-        self.w = ['W1']
-        self.b = ['b1']
-
         # Initialize input layer; this is different from other layers because it's shape depends
         # on the shape of the input data.
-        params['W1'] = np.random.normal(size=(self.layer_sizes[0], self.input_dimension))
-        params['b1'] = np.random.normal(size=(self.layer_sizes[0], 1))
+        params['W1'] = np.random.normal(scale=0.01, size=(self.layer_sizes[0], self.input_dimension))
+        params['b1'] = np.random.normal(scale=0.01, size=(self.layer_sizes[0], 1))
 
         # Initialize hidden layers
         for layer in range(1, self.num_layers):
-            weight = 'W' + str(layer + 1)
-            bias = 'b' + str(layer + 1)
-            self.w.append(weight)
-            self.b.append(bias)
             params[self.w[layer]] = np.random.normal(size=(self.layer_sizes[layer], self.layer_sizes[layer - 1]))
             params[self.b[layer]] = np.random.normal(size=(self.layer_sizes[layer], 1))
 
         # Initialize output layer, which depends on the number of classes being classified.
-        weight = 'W' + str(self.num_layers + 1)
-        bias = 'b' + str(self.num_layers + 1)
-        self.w.append(weight)
-        self.b.append(bias)
-        params[weight] = np.random.normal(size=(self.num_classes, self.layer_sizes[self.num_layers - 1]))
-        params[bias] = np.random.normal(size=(self.num_classes, 1))
+        params[self.w[-1]] = np.random.normal(size=(self.num_classes, self.layer_sizes[self.num_layers - 1]))
+        params[self.b[-1]] = np.random.normal(size=(self.num_classes, 1))
 
         return params
 
@@ -102,7 +116,8 @@ class NeuralNet:
             cache[str(layer + 1)] = self.activation.activate(z)
 
         # Output layer; no activation function here
-        logits = np.matmul(params[self.w[self.num_layers]], cache[str(self.num_layers)]) + params[self.b[self.num_layers]]
+        logits = np.matmul(params[self.w[self.num_layers]], cache[str(self.num_layers)]) + params[
+            self.b[self.num_layers]]
 
         # Calculate the loss from logits
         cost, output = self.loss.calculate_loss(logits, labels)
@@ -141,7 +156,8 @@ class NeuralNet:
     and has no effect on the training. If verbose is set to true, the progress is reported every epoch and a 
     plot of the performance history is generated at the end. Returns the set of trained parameters.
     '''
-    def nn_train(self, reg_strength, epochs, batch_size, learning_rate, decay_rate, verbose):
+
+    def nn_train(self, reg_strength, epochs, batch_size, learning_rate, decay_rate, verbose, opt_params):
         # Initialize variables, preprocess data.
         m = self.trainData.shape[1]
         training_losses = []
@@ -150,9 +166,13 @@ class NeuralNet:
         dev_accs = []
         epoch = 0
         iterations = m // batch_size * epochs
+        opt_params['epoch'] = 0
 
         # Initialize architecture
         params = self.init_params()
+
+        # Make sure the optimization parameters are valid and present
+        self.optimizer.verify_params(opt_params)
 
         # Train model.
         for it in range(iterations):
@@ -168,14 +188,16 @@ class NeuralNet:
             grads = self.backward_prop(data, cache, labels, params)
 
             # Update parameters with both gradients and regularization.
-            for weight in self.w:
-                params[weight] -= learning_rate * (grads[weight] + 2 * reg_strength * params[weight])
-            for bias in self.b:
-                params[bias] -= learning_rate * grads[bias]
+            self.optimizer.update(params, learning_rate, reg_strength, grads, opt_params)
 
-            # Decay the learning rate every epoch
+            # Pass current iteration to optimizer in case some parameters need to be corrected
+            opt_params['iteration'] = it
+
+            # Decay the learning rate every epoch. and pass the current epoch to the optimizer
+            # in case some parameters need to be annealed
             if it % (m // batch_size) == 0:
                 epoch += 1
+                opt_params['epoch'] = epoch
                 learning_rate *= decay_rate
 
                 # If verbose, provide a progress report
@@ -196,6 +218,7 @@ class NeuralNet:
 
         # If verbose, plot model performance history.
         if verbose:
+            print(len(training_accs))
             self.plot(training_accs, dev_accs, training_losses, dev_losses, epochs)
             plt.show()
 

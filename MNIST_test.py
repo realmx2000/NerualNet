@@ -2,9 +2,10 @@
  Created by Zhaoyu Lou on 12/24/17.
 '''
 
-import numpy as np
-from neuralNet import NeuralNet
 import pickle
+import numpy as np
+
+from neuralNet import NeuralNet
 
 
 # Load images and labels.
@@ -23,6 +24,7 @@ def one_hot_labels(labels):
 
 # Load MNIST dataset and train neural network on it.
 def main():
+    np.random.seed(100)
     # Load training dataset and randomize.
     trainData, trainLabels = readData('images_train.csv', 'labels_train.csv')
     trainLabels = one_hot_labels(trainLabels)
@@ -48,10 +50,15 @@ def main():
     testData = (testData - mean) / std
 
     # Create model and train.
-    net = NeuralNet(2, [300, 150], trainData.shape[1], 10, 'sigmoid', 'cross entropy')
+    net = NeuralNet(2, [300, 150], trainData.shape[1], 10, 'relu', 'cross entropy', 'rmsprop')
     print('Beginning Training.')
     net.input_data(trainData, trainLabels, devData, devLabels)
-    params = net.nn_train(0.0001, 50, 1000, 7.5, 0.98, True)
+
+    # Since we are using SGD, no further parameters are needed for the optimizer
+    optimizer_params = {'mu': 0.5, 'anneal': 0.95, 'decay' : 0.9, 'b1': 0.9, 'b2': 0.999}
+    params = net.nn_train(0.0001, 50, 1000, 0.001, 0.99, True, optimizer_params)
+
+    # params = net.nn_train(0.0001, 50, 1000, 7.5, 0.98, True, optimizer_params)
 
     # Save parameters.
     pickle.dump(params, open('params.pickle', 'wb'))
