@@ -27,8 +27,8 @@ class NeuralNet:
         assert (activation in ['relu', 'sigmoid', 'tanh']), 'Activation must be \'relu\', \'sigmoid\' or \'tanh\'.'
         assert (loss in ['cross entropy', 'hinge']), 'Loss must be either \'cross entropy\' or \'hinge\'.'
         assert (len(layer_sizes) == num_hidden_layers), 'Too many or too few layer sizes given.'
-        assert (optimizer in ['sgd', 'momentum', 'adagrad', 'rmsprop']), \
-            'Optimizer must be \'sgd\', \'momentum\', \'adagrad\', \'rmsprop\', or \'adam\'.'
+        assert (optimizer in ['sgd', 'momentum', 'nesterov', 'adagrad', 'rmsprop', 'adadelta', 'adam']), \
+            'Optimizer must be \'sgd\', \'momentum\', \'nesterov\', \'adagrad\', \'rmsprop\', or \'adam\'.'
 
         # Set hyperparameters
         self.num_layers = num_hidden_layers
@@ -64,10 +64,14 @@ class NeuralNet:
             self.optimizer = optimizers.SGD(self.w, self.b)
         elif optimizer == 'momentum':
             self.optimizer = optimizers.Momentum(self.w, self.b)
+        elif optimizer == 'nesterov':
+            self.optimizer = optimizers.NAG(self.w, self.b)
         elif optimizer == 'adagrad':
             self.optimizer = optimizers.Adagrad(self.w, self.b)
         elif optimizer == 'rmsprop':
             self.optimizer = optimizers.RMSprop(self.w, self.b)
+        elif optimizer == 'adadelta':
+            self.optimizer = optimizers.Adadelta(self.w, self.b)
         elif optimizer == 'adam':
             self.optimizer = optimizers.Adam(self.w, self.b)
 
@@ -83,12 +87,12 @@ class NeuralNet:
 
         # Initialize hidden layers
         for layer in range(1, self.num_layers):
-            params[self.w[layer]] = np.random.normal(size=(self.layer_sizes[layer], self.layer_sizes[layer - 1]))
-            params[self.b[layer]] = np.random.normal(size=(self.layer_sizes[layer], 1))
+            params[self.w[layer]] = np.random.normal(scale=0.01, size=(self.layer_sizes[layer], self.layer_sizes[layer - 1]))
+            params[self.b[layer]] = np.random.normal(scale=0.01, size=(self.layer_sizes[layer], 1))
 
         # Initialize output layer, which depends on the number of classes being classified.
-        params[self.w[-1]] = np.random.normal(size=(self.num_classes, self.layer_sizes[self.num_layers - 1]))
-        params[self.b[-1]] = np.random.normal(size=(self.num_classes, 1))
+        params[self.w[-1]] = np.random.normal(scale=0.01, size=(self.num_classes, self.layer_sizes[self.num_layers - 1]))
+        params[self.b[-1]] = np.random.normal(scale=0.01, size=(self.num_classes, 1))
 
         return params
 
@@ -150,14 +154,15 @@ class NeuralNet:
 
     '''
     Trains the neural network.
-    Training is done via minibatch gradient descent. Hyperparameters are taken as inputs to this function.
-    Note that minibatches are taken sequentially, so the training data must be randomized prior to training.
-    The learning rate is reduced by a factor of the decay rate every epoch. The dev set is used for validation 
-    and has no effect on the training. If verbose is set to true, the progress is reported every epoch and a 
-    plot of the performance history is generated at the end. Returns the set of trained parameters.
+    Training is done in minibatches, where the optimizer was set by the user during initialization.
+    Hyperparameters are taken as inputs to this function. Note that minibatches are taken sequentially, 
+    so the training data must be randomized prior to training. The learning rate is annealed by a factor 
+    of the decay rate every epoch. The dev set is used for validation and has no effect on the training. 
+    If verbose is set to true, the progress is reported every epoch and a plot of the performance history 
+    is generated at the end. Returns the set of trained parameters.
     '''
 
-    def nn_train(self, reg_strength, epochs, batch_size, learning_rate, decay_rate, verbose, opt_params):
+    def train(self, epochs, batch_size, learning_rate, opt_params, reg_strength=0, decay_rate=1, verbose=False):
         # Initialize variables, preprocess data.
         m = self.trainData.shape[1]
         training_losses = []
@@ -176,7 +181,6 @@ class NeuralNet:
 
         # Train model.
         for it in range(iterations):
-
             # Select minibatches sequentially.
             start = (it * batch_size) % m
             end = start + batch_size
@@ -187,11 +191,12 @@ class NeuralNet:
             cache, params['o'], cost = self.forward_prop(data, labels, params)
             grads = self.backward_prop(data, cache, labels, params)
 
+            # Pass current iteration to optimizer in case some parameters need to be corrected
+            opt_params['iteration'] = it + 1
+
             # Update parameters with both gradients and regularization.
             self.optimizer.update(params, learning_rate, reg_strength, grads, opt_params)
 
-            # Pass current iteration to optimizer in case some parameters need to be corrected
-            opt_params['iteration'] = it
 
             # Decay the learning rate every epoch. and pass the current epoch to the optimizer
             # in case some parameters need to be annealed
@@ -203,29 +208,43 @@ class NeuralNet:
                 # If verbose, provide a progress report
                 if verbose:
                     # Evaluate model on both the entire training set and the entire dev set.
-                    _, _, train_loss = self.forward_prop(self.trainData, self.trainLabels, params)
-                    _, _, val_loss = self.forward_prop(self.devData, self.devLabels, params)
-                    train_accuracy = self.nn_test(self.trainData, self.trainLabels, params)
-                    dev_accuracy = self.nn_test(self.devData, self.devLabels, params)
-
-                    print('Epoch %d, Train Accuracy %f, Validation Accuracy %f' % (epoch, train_accuracy, dev_accuracy))
-
-                    # Store a history of losses and accuracies to plot at the end.
-                    training_losses.append(train_loss)
-                    dev_losses.append(val_loss)
-                    training_accs.append(train_accuracy)
-                    dev_accs.append(dev_accuracy)
+                    self.report_progress(params, epoch, opt_params, training_losses, dev_losses, training_accs, dev_accs)
 
         # If verbose, plot model performance history.
         if verbose:
-            print(len(training_accs))
             self.plot(training_accs, dev_accs, training_losses, dev_losses, epochs)
             plt.show()
 
         return params
 
+    # Evaluates model on a the training set and a dev (validation set), prints the results,
+    # and stores them for plotting later.
+    def report_progress(self, params, epoch, opt_params, training_losses, dev_losses, training_accs, dev_accs):
+        # In the case of NAG, the parameters stored are the 'look-ahead' parameters, so
+        # they must be corrected to get the true parameters
+        if self.optimizer == 'nesterov':
+            self.optimizer.correct(params, opt_params, 1)
+
+        # Evaluate model
+        _, _, train_loss = self.forward_prop(self.trainData, self.trainLabels, params)
+        _, _, val_loss = self.forward_prop(self.devData, self.devLabels, params)
+        train_accuracy = self.test(self.trainData, self.trainLabels, params)
+        dev_accuracy = self.test(self.devData, self.devLabels, params)
+
+        print('Epoch %d, Train Accuracy %f, Validation Accuracy %f' % (epoch, train_accuracy, dev_accuracy))
+
+        # Set the parameters back if we changed them
+        if self.optimizer == 'nesterov':
+            self.optimizer.correct(params, opt_params, -1)
+
+        # Store a history of losses and accuracies to plot at the end.
+        training_losses.append(train_loss)
+        dev_losses.append(val_loss)
+        training_accs.append(train_accuracy)
+        dev_accs.append(dev_accuracy)
+
     # Tests the neural network on a validation dataset and returns the accuracy.
-    def nn_test(self, data, labels, params):
+    def test(self, data, labels, params):
         _, output, _ = self.forward_prop(data, labels, params)
         accuracy = self.compute_accuracy(output, labels)
         return accuracy

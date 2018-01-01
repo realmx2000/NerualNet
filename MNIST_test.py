@@ -38,7 +38,7 @@ def main():
     trainData = trainData[10000:, :]
     trainLabels = trainLabels[10000:, :]
 
-    # Center and whiten data.
+    # Normalize data.
     mean = np.mean(trainData)
     std = np.std(trainData)
     trainData = (trainData - mean) / std
@@ -50,21 +50,21 @@ def main():
     testData = (testData - mean) / std
 
     # Create model and train.
-    net = NeuralNet(2, [300, 150], trainData.shape[1], 10, 'relu', 'cross entropy', 'rmsprop')
+    net = NeuralNet(2, [300, 150], trainData.shape[1], 10, 'relu', 'cross entropy', 'nesterov')
     print('Beginning Training.')
     net.input_data(trainData, trainLabels, devData, devLabels)
 
-    # Since we are using SGD, no further parameters are needed for the optimizer
-    optimizer_params = {'mu': 0.5, 'anneal': 0.95, 'decay' : 0.9, 'b1': 0.9, 'b2': 0.999}
-    params = net.nn_train(0.0001, 50, 1000, 0.001, 0.99, True, optimizer_params)
-
-    # params = net.nn_train(0.0001, 50, 1000, 7.5, 0.98, True, optimizer_params)
+    # Since we are using NAG, we need to supply the initial momentum and the annealing rate.
+    optimizer_params = {'mu': 0.9, 'anneal': 0.9}
+    params = net.train(epochs=10, batch_size=1000, learning_rate=0.1, reg_strength=0.0002,
+                       decay_rate=0.99, verbose=True, opt_params=optimizer_params)
+    print('Training Complete.')
 
     # Save parameters.
     pickle.dump(params, open('params.pickle', 'wb'))
 
     # Test model on test dataset and report accuracy.
-    accuracy = net.nn_test(testData.T, testLabels.T, params)
+    accuracy = net.test(testData.T, testLabels.T, params)
     print('Test accuracy: %f' % accuracy)
 
 
