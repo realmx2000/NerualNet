@@ -86,7 +86,7 @@ class Momentum:
 '''
 Nesterov Accelerated Gradient: NAG improves on standard momentum optimization by noting
 that we know a priori some information about where the parameters will end up on the next
-step - we know that part of the update is the vector (momentum * velocity(, and both of 
+step - we know that part of the update is the vector (momentum * velocity), and both of 
 those quantities are known. We can therefore 'look ahead' at where we are going and evaluate
 the gradient there instead of at our current position for a better estimate of the true 
 acceleration we would feel in the real world. Note that in NAG, the parameters we store 
